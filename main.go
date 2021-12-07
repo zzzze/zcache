@@ -29,9 +29,9 @@ func startCacheServer(addr string, peers []string, group *zcache.Group) {
 	p := zcache.NewHTTPPool(addr)
 	p.Set(peers...)
 	group.RegisterPeers(p)
-  log.Println("zcache server is runing at", addr)
+	log.Println("zcache server is runing at", addr)
 	addr = strings.TrimPrefix(strings.TrimPrefix(addr, "http://"), "https://")
-  log.Fatal(http.ListenAndServe(addr, p))
+	log.Fatal(http.ListenAndServe(addr, p))
 }
 
 func startAPIServer(group *zcache.Group) {
@@ -45,8 +45,8 @@ func startAPIServer(group *zcache.Group) {
 		rw.Header().Set("Content-Type", "text/plain")
 		rw.Write(view.ByteSlice())
 	}))
-  log.Println("api server is runing at", addr)
-  log.Fatal(http.ListenAndServe(addr, nil))
+	log.Println("api server is runing at", addr)
+	log.Fatal(http.ListenAndServe(addr, nil))
 }
 
 func main() {
@@ -58,7 +58,7 @@ func main() {
 	flag.BoolVar(&api, "api", false, "start a api server?")
 	flag.Parse()
 	addrs := strings.Split(peers, ",")
-  group := createGroup("age")
+	group := createGroup("age")
 	if api {
 		go startAPIServer(group)
 	}

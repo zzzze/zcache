@@ -4,46 +4,55 @@ import "container/list"
 
 // Cache ...
 type Cache struct {
-	MaxEntries int
-	ll         *list.List
-	cache      map[interface{}]*list.Element
-	OnEvicted  func(key, value interface{})
+	maxBytes  int64
+	nBytes    int64
+	ll        *list.List
+	cache     map[interface{}]*list.Element
+	OnEvicted func(key, value interface{})
+}
+
+// Value ...
+type Value interface {
+	Len() int
 }
 
 type entry struct {
-	key   interface{}
-	value interface{}
+	key   string
+	value Value
 }
 
 // New ...
-func New(maxEntries int) *Cache {
+func New(maxBytes int64) *Cache {
 	return &Cache{
-		MaxEntries: maxEntries,
-		ll:         list.New(),
-		cache:      make(map[interface{}]*list.Element),
+		maxBytes: maxBytes,
+		ll:       list.New(),
+		cache:    make(map[interface{}]*list.Element),
 	}
 }
 
 // Add ...
-func (c *Cache) Add(key, value interface{}) {
+func (c *Cache) Add(key string, value Value) {
 	if c.cache == nil {
 		c.cache = make(map[interface{}]*list.Element)
 		c.ll = list.New()
 	}
 	if item, hit := c.cache[key]; hit {
 		c.ll.MoveToFront(item)
-		item.Value.(*entry).value = value
+		kv := item.Value.(*entry)
+		c.nBytes += int64(value.Len() - kv.value.Len())
+		kv.value = value
 		return
 	}
 	item := c.ll.PushFront(&entry{key, value})
 	c.cache[key] = item
-  if c.MaxEntries != 0 && c.ll.Len() > c.MaxEntries {
-    c.RemoveOldest()
-  }
+	c.nBytes += int64(len(key) + value.Len())
+	if c.maxBytes != 0 && c.nBytes > c.maxBytes {
+		c.RemoveOldest()
+	}
 }
 
 // Get ...
-func (c *Cache) Get(key interface{}) (value interface{}, hit bool) {
+func (c *Cache) Get(key string) (value Value, hit bool) {
 	if c.cache == nil {
 		return nil, false
 	}
@@ -56,7 +65,7 @@ func (c *Cache) Get(key interface{}) (value interface{}, hit bool) {
 }
 
 // Remove ...
-func (c *Cache) Remove(key interface{}) {
+func (c *Cache) Remove(key string) {
 	if c.cache == nil {
 		return
 	}
@@ -79,6 +88,7 @@ func (c *Cache) RemoveOldest() {
 func (c *Cache) removeElement(item *list.Element) {
 	c.ll.Remove(item)
 	kv := item.Value.(*entry)
+	c.nBytes -= int64(len(kv.key) + kv.value.Len())
 	delete(c.cache, kv.key)
 	if c.OnEvicted != nil {
 		c.OnEvicted(kv.key, kv.value)

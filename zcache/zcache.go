@@ -1,6 +1,7 @@
 package zcache
 
 import (
+	"log"
 	"sync"
 	"zcache/singleflight"
 )
@@ -35,6 +36,7 @@ type Group struct {
   cacheBytes int64
   getter Getter
   loader singleflight.Group
+  peers PeerPicker
 }
 
 // NewGroup ...
@@ -53,18 +55,39 @@ func NewGroup(name string, cacheBytes int64, getter Getter) *Group {
 
 // Get ...
 func (g *Group) Get(key string) (ByteView, error) {
-  val, err := g.loader.Do(key, func() (interface{}, error) {
-    val, ok := g.mainCache.get(key)
-    if !ok {
-      data, err := g.getter.Get(key)
-      v := ByteView{data}
-      if err != nil {
-        return v, err
-      }
-      g.mainCache.add(key, v)
-      return v, nil
-    }
+  if val, ok := g.mainCache.get(key); ok {
+    log.Println("[zcache] hit")
     return val, nil
+  }
+  return g.load(key)
+}
+
+func (g *Group) load(key string) (ByteView, error) {
+  val, err := g.loader.Do(key, func() (interface{}, error) {
+    if g.peers != nil {
+      if peer, ok := g.peers.PickPeer(key); ok {
+        return peer.Get(g.name, key)
+      }
+    }
+    return g.getLocally(key)
   })
   return val.(ByteView), err
+}
+
+func (g *Group) getLocally(key string) (ByteView, error) {
+  data, err := g.getter.Get(key)
+  v := ByteView{data}
+  if err != nil {
+    return v, err
+  }
+  g.mainCache.add(key, v)
+  return v, nil
+}
+
+// RegisterPeers ...
+func (g *Group) RegisterPeers(peers PeerPicker) {
+  if g.peers != nil {
+    panic("RegisterPeers called more then once")
+  }
+  g.peers = peers
 }

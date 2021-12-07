@@ -1,4 +1,4 @@
-module zcache
+module z-cache
 
 go 1.17
 

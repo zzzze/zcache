@@ -4,6 +4,7 @@ import (
 	"log"
 	"sync"
 	"zcache/singleflight"
+	pb "zcache/zcachepb"
 )
 
 var mu sync.RWMutex
@@ -66,7 +67,15 @@ func (g *Group) load(key string) (ByteView, error) {
   val, err := g.loader.Do(key, func() (interface{}, error) {
     if g.peers != nil {
       if peer, ok := g.peers.PickPeer(key); ok {
-        return peer.Get(g.name, key)
+        var res pb.Response
+        req := &pb.Request{
+          Group: g.name,
+          Key: key,
+        }
+        if err := peer.Get(req, &res); err != nil {
+          return ByteView{}, err
+        }
+        return ByteView{res.Value}, nil
       }
     }
     return g.getLocally(key)

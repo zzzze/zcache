@@ -9,6 +9,9 @@ import (
 	"strings"
 	"sync"
 	"zcache/consistenthash"
+	pb "zcache/zcachepb"
+
+	"google.golang.org/protobuf/proto"
 )
 
 const defaultBasePath = "/_zcache"
@@ -103,18 +106,32 @@ type httpGetter struct {
 	baseURL string
 }
 
-func (h *httpGetter) Get(group, key string) (ByteView, error) {
-	u := fmt.Sprintf("%s/%s/%s", h.baseURL, group, key)
+func (h *httpGetter) Get(in *pb.Request, out *pb.Response) error {
+	u := fmt.Sprintf("%s/%s/%s", h.baseURL, in.Group, in.Key)
 	res, err := http.Get(u)
 	if err != nil {
-		return ByteView{}, err
+		return err
 	}
 	defer res.Body.Close()
 	data, err := io.ReadAll(res.Body)
 	if err != nil {
-		return ByteView{}, err
+		return err
 	}
-	return ByteView{data}, nil
+	return proto.Unmarshal(data, out)
 }
+
+// func (h *httpGetter) Get(group, key string) (ByteView, error) {
+// 	u := fmt.Sprintf("%s/%s/%s", h.baseURL, group, key)
+// 	res, err := http.Get(u)
+// 	if err != nil {
+// 		return ByteView{}, err
+// 	}
+// 	defer res.Body.Close()
+// 	data, err := io.ReadAll(res.Body)
+// 	if err != nil {
+// 		return ByteView{}, err
+// 	}
+// 	return ByteView{data}, nil
+// }
 
 var _ HTTPGetter = (*httpGetter)(nil)

@@ -1,8 +1,11 @@
 package zcache
 
+import pb "zcache/zcachepb"
+
 // HTTPGetter ...
 type HTTPGetter interface {
-  Get(group, key string) (ByteView, error)
+  // Get(group, key string) (ByteView, error)
+  Get(in *pb.Request, out *pb.Response) error
 }
 
 // PeerPicker ...

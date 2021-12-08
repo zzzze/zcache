@@ -14,7 +14,7 @@ type Map struct {
 	hash     Hash
 	replicas int            // 虚拟节点个数
 	keys     []int          // 哈希环
-	hashMap  map[int]string // 节点哈希于节点的对应关系
+	hashMap  map[int]string // 节点哈希与节点的对应关系
 }
 
 // New ...

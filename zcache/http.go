@@ -2,13 +2,13 @@ package zcache
 
 import (
 	"fmt"
-	"hash/crc32"
 	"io"
 	"log"
 	"net/http"
 	"net/url"
 	"strings"
 	"sync"
+	"zcache/consistenthash"
 )
 
 const defaultBasePath = "/_zcache"
@@ -19,7 +19,7 @@ type HTTPPool struct {
 	self        string
 	httpGetters map[string]*httpGetter
 	basePath    string
-	peers       []string
+	peers       *consistenthash.Map
 }
 
 // NewHTTPPool ...
@@ -39,7 +39,10 @@ func (p *HTTPPool) Log(format string, v ...interface{}) {
 func (p *HTTPPool) Set(peers ...string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.peers = peers
+	if p.peers == nil {
+		p.peers = consistenthash.New(3, nil)
+	}
+	p.peers.Add(peers...)
 	p.httpGetters = make(map[string]*httpGetter)
 	for _, peer := range peers {
 		p.httpGetters[peer] = &httpGetter{
@@ -81,13 +84,13 @@ func (p *HTTPPool) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 // PickPeer ...
 func (p *HTTPPool) PickPeer(key string) (HTTPGetter, bool) {
-	h := crc32.Checksum([]byte(key), crc32.IEEETable)
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if len(p.peers) == 0 {
+	if p.peers == nil {
 		return nil, false
 	}
-	if peer := p.peers[int(h)%len(p.peers)]; peer != p.self {
+	peer := p.peers.Get(key)
+	if peer != "" && peer != p.self {
 		return p.httpGetters[peer], true
 	}
 	return nil, false
